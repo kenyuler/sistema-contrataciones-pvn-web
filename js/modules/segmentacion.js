@@ -1,100 +1,101 @@
 // js/modules/segmentacion.js
 
 const segmentacionModule = (() => {
-    let currentProcesoId = null;
     let moduleContainer = null;
+    let currentProceso = null;
 
     function render() {
-        const proceso = appData.getProcess(currentProcesoId);
-        if (!proceso) {
-            moduleContainer.innerHTML = '<p class="alert alert-danger">Proceso no encontrado para cargar Segmentación.</p>';
+        if (!moduleContainer) {
+            console.error('Segmentación: moduleContainer es null. No se puede renderizar.');
+            return;
+        }
+        if (!currentProceso) {
+            moduleContainer.innerHTML = '<p class="alert alert-warning">No se ha especificado un proceso para la segmentación.</p>';
             return;
         }
 
-        const data = proceso.segmentacionData || {};
-
-        let html = `
-            <div class="card mt-3">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <span>Módulo de Segmentación para: <strong class="text-primary">${proceso.nombre}</strong></span>
-                    <button class="btn btn-secondary btn-sm" id="back-to-process-detail">← Volver al Proceso</button>
+        moduleContainer.innerHTML = `
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Segmentación de Mercado para ${currentProceso.nombre || 'Nuevo Proceso'}</h5>
                 </div>
                 <div class="card-body">
                     <form id="segmentacion-form">
-                        <h5 class="form-title mb-4">Detalles de Segmentación del Mercado</h5>
-
                         <div class="mb-3">
-                            <label for="tipoSegmentacion" class="form-label">Tipo de Segmentación:</label>
-                            <select class="form-select" id="tipoSegmentacion">
-                                <option value="">Seleccione Tipo</option>
-                                <option value="Mercado Nacional" ${data.tipoSegmentacion === 'Mercado Nacional' ? 'selected' : ''}>Mercado Nacional</option>
-                                <option value="Mercado Internacional" ${data.tipoSegmentacion === 'Mercado Internacional' ? 'selected' : ''}>Mercado Internacional</option>
-                                <option value="Monopolio Natural" ${data.tipoSegmentacion === 'Monopolio Natural' ? 'selected' : ''}>Monopolio Natural</option>
-                                <option value="Proveedor Único" ${data.tipoSegmentacion === 'Proveedor Único' ? 'selected' : ''}>Proveedor Único</option>
-                            </select>
+                            <label for="seg-mercado" class="form-label">Mercado</label>
+                            <input type="text" class="form-control" id="seg-mercado" value="${currentProceso.segmentacion.mercado || ''}">
                         </div>
-
                         <div class="mb-3">
-                            <label for="analisisDemanda" class="form-label">Análisis de la Demanda:</label>
-                            <textarea class="form-control" id="analisisDemanda" rows="3" placeholder="Descripción del análisis de la demanda...">${data.analisisDemanda || ''}</textarea>
+                            <label for="seg-segmento" class="form-label">Segmento</label>
+                            <input type="text" class="form-control" id="seg-segmento" value="${currentProceso.segmentacion.segmento || ''}">
                         </div>
-
                         <div class="mb-3">
-                            <label for="analisisOferta" class="form-label">Análisis de la Oferta:</label>
-                            <textarea class="form-control" id="analisisOferta" rows="3" placeholder="Descripción del análisis de la oferta...">${data.analisisOferta || ''}</textarea>
+                            <label for="seg-proveedores-potenciales" class="form-label">Número de Proveedores Potenciales</label>
+                            <input type="number" class="form-control" id="seg-proveedores-potenciales" value="${currentProceso.segmentacion.proveedoresPotenciales || ''}">
                         </div>
-
                         <div class="mb-3">
-                            <label for="estudioMercado" class="form-label">Estudio de Mercado Realizado:</label>
-                            <textarea class="form-control" id="estudioMercado" rows="3" placeholder="Resultados del estudio de mercado...">${data.estudioMercado || ''}</textarea>
+                            <label for="seg-analisis-riesgos" class="form-label">Análisis de Riesgos</label>
+                            <textarea class="form-control" id="seg-analisis-riesgos" rows="3">${currentProceso.segmentacion.analisisRiesgos || ''}</textarea>
                         </div>
-
-                        <button type="submit" class="btn btn-primary mt-4" id="save-segmentacion-btn">Guardar Datos de Segmentación</button>
+                        
+                        <button type="submit" class="btn btn-primary"><i class="bi bi-save me-2"></i>Guardar Segmentación</button>
                     </form>
                 </div>
             </div>
         `;
-        moduleContainer.innerHTML = html;
-
-        moduleContainer.querySelector('#segmentacion-form').addEventListener('submit', saveSegmentacion);
-        
-        moduleContainer.querySelector('#back-to-process-detail').addEventListener('click', () => {
-            if (typeof app !== 'undefined' && app.loadModule) {
-                app.loadModule('seguimiento', currentProcesoId);
-            } else {
-                console.error('app.loadModule no está disponible.');
-            }
-        });
+        setupEventListeners();
     }
 
-    function saveSegmentacion(event) {
-        event.preventDefault();
+    function setupEventListeners() {
+        if (!moduleContainer) return;
 
-        const proceso = appData.getProcess(currentProcesoId);
-        if (!proceso) {
-            console.error('Proceso no encontrado al intentar guardar datos de Segmentación.');
-            return;
+        const form = moduleContainer.querySelector('#segmentacion-form');
+        if (form) {
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                console.log('Segmentación: Guardando datos de segmentación...');
+
+                const updatedProceso = {
+                    ...currentProceso,
+                    segmentacion: {
+                        mercado: document.getElementById('seg-mercado').value,
+                        segmento: document.getElementById('seg-segmento').value,
+                        proveedoresPotenciales: parseInt(document.getElementById('seg-proveedores-potenciales').value) || 0,
+                        analisisRiesgos: document.getElementById('seg-analisis-riesgos').value
+                    }
+                };
+                
+                if (typeof appData !== 'undefined' && typeof appData.updateProcess === 'function') {
+                    appData.updateProcess(updatedProceso);
+                    alert('Datos de segmentación guardados exitosamente!');
+                    currentProceso = appData.getProcess(currentProceso.id); // Actualizar el currentProceso localmente
+                } else {
+                    console.error('Segmentación: appData o appData.updateProcess no están disponibles.');
+                    alert('Hubo un error al guardar los datos de segmentación.');
+                }
+            });
         }
-
-        const updatedData = {
-            tipoSegmentacion: document.getElementById('tipoSegmentacion').value,
-            analisisDemanda: document.getElementById('analisisDemanda').value,
-            analisisOferta: document.getElementById('analisisOferta').value,
-            estudioMercado: document.getElementById('estudioMercado').value
-        };
-
-        proceso.segmentacionData = updatedData;
-        
-        appData.updateProcess(proceso);
-
-        alert('Datos de Segmentación guardados exitosamente.');
-        console.log('Datos de Segmentación guardados:', proceso);
     }
 
     return {
         init: (procesoId, containerElement) => {
-            currentProcesoId = procesoId;
             moduleContainer = containerElement;
+            if (typeof appData === 'undefined') {
+                console.error('Segmentación: appData no está definido al inicializar.');
+                if (moduleContainer) {
+                    moduleContainer.innerHTML = '<p class="alert alert-danger">Error: Datos de la aplicación no disponibles.</p>';
+                }
+                return;
+            }
+            currentProceso = appData.getProcess(procesoId);
+            if (!currentProceso) {
+                console.error('Segmentación: Proceso no encontrado con ID:', procesoId);
+                if (moduleContainer) {
+                    moduleContainer.innerHTML = `<p class="alert alert-warning">Proceso con ID "${procesoId}" no encontrado para el módulo de Segmentación.</p>`;
+                }
+                return;
+            }
+            console.log('Segmentación: init() llamado para proceso:', currentProceso);
             render();
         }
     };
