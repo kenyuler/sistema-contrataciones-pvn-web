@@ -1,119 +1,179 @@
 // js/modules/dashboard.js
 
 const dashboardModule = (() => {
-    let moduleContainer = null;
+    let moduleContainer = null; // Debe inicializarse a null
 
+    // Función para renderizar el contenido del dashboard
     function render() {
-        // Aseguramos que appData.procesos esté disponible y sea un array
-        const procesos = appData.procesos || []; 
+        if (!moduleContainer) {
+            console.error('Dashboard: moduleContainer es null o undefined en render(). Esto no debería pasar si init() se llamó correctamente.');
+            return; // Salir si el contenedor no es válido
+        }
+        moduleContainer.innerHTML = ''; // Aquí es donde ocurre el error si moduleContainer es null
 
-        moduleContainer.innerHTML = `
-            <div class="card bg-light mb-3">
-                <div class="card-body text-center">
-                    <h2 class="card-title text-primary">Bienvenido al Sistema de Gestión de Contrataciones</h2>
-                    <p class="card-text lead">Aquí podrás administrar y dar seguimiento a todos tus procesos de contratación.</p>
-                    <hr>
-                    <div class="row">
-                        <div class="col-md-4 mb-3">
-                            <div class="p-3 border rounded h-100 d-flex flex-column justify-content-center align-items-center">
-                                <i class="bi bi-folder-plus text-success" style="font-size: 3rem;"></i>
-                                <h5 class="mt-2">Crear Nuevo Proceso</h5>
-                                <p class="text-muted">Inicia un nuevo expediente de contratación.</p>
-                                <button class="btn btn-success mt-auto" id="create-process-btn">Crear Proceso</button>
-                            </div>
+        // Asegúrate de que appData está disponible antes de usarlo
+        if (typeof appData === 'undefined') {
+            console.error('Dashboard: appData no está definido. No se pueden cargar los procesos.');
+            moduleContainer.innerHTML = '<p class="alert alert-danger">Error: Datos de la aplicación no disponibles. Por favor, recarga la página.</p>';
+            return;
+        }
+
+        const procesos = appData.getProcesos(); // Obtener los procesos de appData
+
+        let dashboardHtml = `
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2 class="mb-0 text-primary">Dashboard de Contrataciones</h2>
+                <button class="btn btn-success" id="new-process-btn-dashboard"><i class="bi bi-plus-circle me-2"></i>Nuevo Proceso</button>
+            </div>
+
+            <div class="row">
+                <div class="col-md-4 mb-4">
+                    <div class="card bg-info text-white shadow-sm">
+                        <div class="card-body">
+                            <h5 class="card-title">Total de Procesos</h5>
+                            <p class="card-text fs-3">${procesos.length}</p>
                         </div>
-                        <div class="col-md-4 mb-3">
-                            <div class="p-3 border rounded h-100 d-flex flex-column justify-content-center align-items-center">
-                                <i class="bi bi-list-check text-info" style="font-size: 3rem;"></i>
-                                <h5 class="mt-2">Ver Procesos Existentes</h5>
-                                <p class="text-muted">Revisa el listado completo de tus procesos.</p>
-                                <button class="btn btn-info mt-auto" id="view-processes-btn">Ver Procesos</button>
-                            </div>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-4">
+                    <div class="card bg-warning text-dark shadow-sm">
+                        <div class="card-body">
+                            <h5 class="card-title">En Ejecución</h5>
+                            <p class="card-text fs-3">${procesos.filter(p => p.estado === 'En Ejecución').length}</p>
                         </div>
-                        <div class="col-md-4 mb-3">
-                            <div class="p-3 border rounded h-100 d-flex flex-column justify-content-center align-items-center">
-                                <i class="bi bi-gear text-secondary" style="font-size: 3rem;"></i>
-                                <h5 class="mt-2">Configuración</h5>
-                                <p class="text-muted">Ajusta las opciones y listas del sistema.</p>
-                                <button class="btn btn-secondary mt-auto" id="settings-btn">Configuración</button>
-                            </div>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-4">
+                    <div class="card bg-success text-white shadow-sm">
+                        <div class="card-body">
+                            <h5 class="card-title">Completados</h5>
+                            <p class="card-text fs-3">${procesos.filter(p => p.estado === 'Completado').length}</p>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div class="card mt-4">
-                <div class="card-header bg-primary text-white">
-                    <h4 class="mb-0">Estadísticas Rápidas</h4>
-                </div>
-                <div class="card-body">
-                    <div class="row text-center">
-                        <div class="col-md-4">
-                            <div class="p-3 border rounded">
-                                <h5>Total de Procesos</h5>
-                                <p class="fs-2 text-primary" id="total-processes">0</p>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="p-3 border rounded">
-                                <h5>En Ejecución</h5>
-                                <p class="fs-2 text-warning" id="in-progress-processes">0</p>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="p-3 border rounded">
-                                <h5>Completados</h5>
-                                <p class="fs-2 text-success" id="completed-processes">0</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+            <h3 class="mt-4 mb-3 text-secondary">Últimos Procesos Activos</h3>
+            <div class="table-responsive">
+                <table class="table table-hover table-striped">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>ID</th>
+                            <th>Nombre del Proceso</th>
+                            <th>Estado</th>
+                            <th>Tipo</th>
+                            <th>Fecha Inicio</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dashboard-processes-table-body">
+                        </tbody>
+                </table>
+            </div>
+            <div class="d-flex justify-content-end mt-3">
+                <button class="btn btn-primary" id="view-all-processes-btn"><i class="bi bi-list-task me-2"></i>Ver Todos los Procesos</button>
             </div>
         `;
+        moduleContainer.innerHTML = dashboardHtml;
 
-        // Update statistics
-        // Usamos la variable local 'procesos' que ya está validada
-        const totalProcesses = procesos.length;
-        const inProgressProcesses = procesos.filter(p => p.estado !== 'Completado' && p.estado !== 'Cancelado').length;
-        const completedProcesses = procesos.filter(p => p.estado === 'Completado').length;
-
-        moduleContainer.querySelector('#total-processes').textContent = totalProcesses;
-        moduleContainer.querySelector('#in-progress-processes').textContent = inProgressProcesses;
-        moduleContainer.querySelector('#completed-processes').textContent = completedProcesses;
-
-
-        // Add event listeners
-        moduleContainer.querySelector('#create-process-btn').addEventListener('click', () => {
-            // Asegurarse de que app y appData estén disponibles
-            if (typeof appData !== 'undefined' && typeof appData.createProcess === 'function' && typeof app !== 'undefined' && typeof app.loadModule === 'function') {
-                const newProcess = appData.createProcess();
-                app.loadModule('seguimiento', newProcess.id);
+        // Llenar la tabla de últimos procesos
+        const tableBody = moduleContainer.querySelector('#dashboard-processes-table-body');
+        if (tableBody) {
+            const latestProcesses = procesos.slice(-5); // Mostrar los últimos 5
+            if (latestProcesses.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="6" class="text-center">No hay procesos recientes.</td></tr>`;
             } else {
-                console.error("Error: appData o app no están completamente definidos al crear proceso.");
-                alert("Hubo un error al iniciar un nuevo proceso. Inténtalo de nuevo.");
+                latestProcesses.forEach(proceso => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${proceso.id}</td>
+                        <td>${proceso.nombre}</td>
+                        <td><span class="badge bg-${getBadgeClass(proceso.estado)}">${proceso.estado || 'N/A'}</span></td>
+                        <td>${proceso.tipoContratacion || 'N/A'}</td>
+                        <td>${proceso.fechaInicio || 'N/A'}</td>
+                        <td>
+                            <button class="btn btn-info btn-sm view-process-detail-dashboard-btn" data-id="${proceso.id}"><i class="bi bi-eye"></i> Ver Detalle</button>
+                        </td>
+                    `;
+                    tableBody.appendChild(row);
+                });
             }
-        });
+        }
 
-        moduleContainer.querySelector('#view-processes-btn').addEventListener('click', () => {
-            if (typeof app !== 'undefined' && typeof app.loadModule === 'function') {
-                app.loadModule('seguimiento'); // Load seguimiento module to view all processes
-            } else {
-                console.error("Error: app no está definido al cargar módulo de seguimiento.");
-            }
-        });
+        // Configurar event listeners
+        setupEventListeners();
+    }
 
-        moduleContainer.querySelector('#settings-btn').addEventListener('click', () => {
-            if (typeof app !== 'undefined' && typeof app.loadModule === 'function') {
-                app.loadModule('settings');
-            } else {
-                console.error("Error: app no está definido al cargar módulo de configuración.");
-            }
+    // Configura los listeners para los botones del dashboard
+    function setupEventListeners() {
+        if (!moduleContainer) return; // Doble verificación
+
+        const newProcessBtn = moduleContainer.querySelector('#new-process-btn-dashboard');
+        if (newProcessBtn) {
+            newProcessBtn.addEventListener('click', () => {
+                console.log('Dashboard: Clic en Nuevo Proceso desde Dashboard.');
+                // Llama a app.loadModule para cargar el módulo de seguimiento y crear un nuevo proceso
+                if (typeof app !== 'undefined' && typeof app.loadModule === 'function' && typeof appData !== 'undefined' && typeof appData.createProcess === 'function') {
+                    const newProcess = appData.createProcess(); // Crea el proceso y obtén su ID
+                    app.loadModule('seguimiento', newProcess.id); // Pasa el ID al módulo de seguimiento
+                } else {
+                    console.error('Error: app.loadModule o appData.createProcess no están disponibles.');
+                    alert('Hubo un error al iniciar un nuevo proceso.');
+                }
+            });
+        }
+
+        const viewAllBtn = moduleContainer.querySelector('#view-all-processes-btn');
+        if (viewAllBtn) {
+            viewAllBtn.addEventListener('click', () => {
+                console.log('Dashboard: Clic en Ver Todos los Procesos. Navegando a Seguimiento.');
+                // Llama a app.loadModule para cargar el módulo de seguimiento (sin ID de proceso específico)
+                if (typeof app !== 'undefined' && typeof app.loadModule === 'function') {
+                    app.loadModule('seguimiento');
+                } else {
+                    console.error('Error: app.loadModule no está disponible para ver todos los procesos.');
+                    alert('Hubo un error al cargar la lista de procesos.');
+                }
+            });
+        }
+
+        moduleContainer.querySelectorAll('.view-process-detail-dashboard-btn').forEach(button => {
+            button.addEventListener('click', (e) => {
+                const id = e.currentTarget.dataset.id;
+                console.log('Dashboard: Clic en Ver Detalle de Proceso para ID:', id);
+                // Llama a app.loadModule para cargar el módulo de seguimiento con el ID del proceso
+                if (typeof app !== 'undefined' && typeof app.loadModule === 'function') {
+                    app.loadModule('seguimiento', id);
+                } else {
+                    console.error('Error: app.loadModule no está disponible para ver el detalle del proceso.');
+                    alert('Hubo un error al cargar el detalle del proceso.');
+                }
+            });
         });
     }
 
+    // Helper para clases de badges
+    function getBadgeClass(estado) {
+        switch (estado) {
+            case 'En Planificación': return 'secondary';
+            case 'En Ejecución': return 'warning';
+            case 'Completado': return 'success';
+            case 'Cancelado': return 'danger';
+            case 'Pendiente': return 'info';
+            default: return 'primary';
+        }
+    }
+
+    // Método de inicialización del módulo dashboard
     return {
-        init: (containerElement) => {
-            moduleContainer = containerElement;
+        init: (id, containerElement) => { // 'id' no se usa directamente en dashboard, pero es parte de la firma esperada por app.loadModule
+            moduleContainer = containerElement; // ¡Aquí se asigna el contenedor!
+            console.log('Dashboard: init() llamado. ContainerElement:', containerElement);
+            if (!moduleContainer) {
+                console.error('Dashboard: Error - containerElement es null o undefined al inicializar el módulo. Renderizado abortado.');
+                // No llamar a render si el contenedor es nulo
+                return;
+            }
             render();
         }
     };
