@@ -1,98 +1,107 @@
 // js/modules/costos.js
 
 const costosModule = (() => {
-    let currentProcesoId = null;
     let moduleContainer = null;
+    let currentProceso = null;
 
     function render() {
-        const proceso = appData.getProcess(currentProcesoId);
-        if (!proceso) {
-            moduleContainer.innerHTML = '<p class="alert alert-danger">Proceso no encontrado para cargar Costos.</p>';
+        if (!moduleContainer) {
+            console.error('Costos: moduleContainer es null. No se puede renderizar.');
+            return;
+        }
+        if (!currentProceso) {
+            moduleContainer.innerHTML = '<p class="alert alert-warning">No se ha especificado un proceso para los costos.</p>';
             return;
         }
 
-        const data = proceso.costosData || {};
+        const config = appData.getConfig();
+        const monedasOptions = config.lists.monedas.map(moneda => `<option value="${moneda}" ${currentProceso.costos.moneda === moneda ? 'selected' : ''}>${moneda}</option>`).join('');
 
-        let html = `
-            <div class="card mt-3">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <span>Módulo de Costos y Presupuesto para: <strong class="text-primary">${proceso.nombre}</strong></span>
-                    <button class="btn btn-secondary btn-sm" id="back-to-process-detail">← Volver al Proceso</button>
+        moduleContainer.innerHTML = `
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Gestión de Costos para ${currentProceso.nombre || 'Nuevo Proceso'}</h5>
                 </div>
                 <div class="card-body">
                     <form id="costos-form">
-                        <h5 class="form-title mb-4">Detalles de Costos y Presupuesto</h5>
-
                         <div class="mb-3">
-                            <label for="valorEstimado" class="form-label">Valor Estimado (S/.):</label>
-                            <input type="number" class="form-control" id="valorEstimado" step="0.01" value="${data.valorEstimado || ''}" placeholder="Ej: 150000.00">
-                        </div>
-
-                        <div class="mb-3">
-                            <label for="fuenteFinanciamiento" class="form-label">Fuente de Financiamiento:</label>
-                            <input type="text" class="form-control" id="fuenteFinanciamiento" value="${data.fuenteFinanciamiento || ''}" placeholder="Ej: Recursos Ordinarios, Endeudamiento">
-                        </div>
-
-                        <div class="mb-3">
-                            <label for="disponibilidadPresupuestal" class="form-label">Disponibilidad Presupuestal:</label>
-                            <select class="form-select" id="disponibilidadPresupuestal">
-                                <option value="">Seleccione</option>
-                                <option value="Sí" ${data.disponibilidadPresupuestal === 'Sí' ? 'selected' : ''}>Sí</option>
-                                <option value="No" ${data.disponibilidadPresupuestal === 'No' ? 'selected' : ''}>No</option>
+                            <label for="costo-moneda" class="form-label">Moneda</label>
+                            <select class="form-select" id="costo-moneda">
+                                <option value="">Seleccione Moneda</option>
+                                ${monedasOptions}
                             </select>
                         </div>
-
                         <div class="mb-3">
-                            <label for="sustentoCosto" class="form-label">Sustento del Costo Estimado:</label>
-                            <textarea class="form-control" id="sustentoCosto" rows="3" placeholder="Metodología o documentos que sustentan el costo...">${data.sustentoCosto || ''}</textarea>
+                            <label for="costo-presupuesto-estimado" class="form-label">Presupuesto Estimado</label>
+                            <input type="number" step="0.01" class="form-control" id="costo-presupuesto-estimado" value="${currentProceso.costos.presupuestoEstimado || ''}">
                         </div>
-
-                        <button type="submit" class="btn btn-primary mt-4" id="save-costos-btn">Guardar Datos de Costos</button>
+                        <div class="mb-3">
+                            <label for="costo-real" class="form-label">Costo Real</label>
+                            <input type="number" step="0.01" class="form-control" id="costo-real" value="${currentProceso.costos.costoReal || ''}">
+                        </div>
+                        <div class="mb-3">
+                            <label for="costo-fuente-financiamiento" class="form-label">Fuente de Financiamiento</label>
+                            <input type="text" class="form-control" id="costo-fuente-financiamiento" value="${currentProceso.costos.fuenteFinanciamiento || ''}">
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary"><i class="bi bi-save me-2"></i>Guardar Costos</button>
                     </form>
                 </div>
             </div>
         `;
-        moduleContainer.innerHTML = html;
-
-        moduleContainer.querySelector('#costos-form').addEventListener('submit', saveCostos);
-        
-        moduleContainer.querySelector('#back-to-process-detail').addEventListener('click', () => {
-            if (typeof app !== 'undefined' && app.loadModule) {
-                app.loadModule('seguimiento', currentProcesoId);
-            } else {
-                console.error('app.loadModule no está disponible.');
-            }
-        });
+        setupEventListeners();
     }
 
-    function saveCostos(event) {
-        event.preventDefault();
+    function setupEventListeners() {
+        if (!moduleContainer) return;
 
-        const proceso = appData.getProcess(currentProcesoId);
-        if (!proceso) {
-            console.error('Proceso no encontrado al intentar guardar datos de Costos.');
-            return;
+        const form = moduleContainer.querySelector('#costos-form');
+        if (form) {
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                console.log('Costos: Guardando datos de costos...');
+
+                const updatedProceso = {
+                    ...currentProceso,
+                    costos: {
+                        moneda: document.getElementById('costo-moneda').value,
+                        presupuestoEstimado: parseFloat(document.getElementById('costo-presupuesto-estimado').value) || 0,
+                        costoReal: parseFloat(document.getElementById('costo-real').value) || 0,
+                        fuenteFinanciamiento: document.getElementById('costo-fuente-financiamiento').value
+                    }
+                };
+                
+                if (typeof appData !== 'undefined' && typeof appData.updateProcess === 'function') {
+                    appData.updateProcess(updatedProceso);
+                    alert('Datos de costos guardados exitosamente!');
+                    currentProceso = appData.getProcess(currentProceso.id); // Actualizar el currentProceso localmente
+                } else {
+                    console.error('Costos: appData o appData.updateProcess no están disponibles.');
+                    alert('Hubo un error al guardar los datos de costos.');
+                }
+            });
         }
-
-        const updatedData = {
-            valorEstimado: parseFloat(document.getElementById('valorEstimado').value) || null,
-            fuenteFinanciamiento: document.getElementById('fuenteFinanciamiento').value,
-            disponibilidadPresupuestal: document.getElementById('disponibilidadPresupuestal').value,
-            sustentoCosto: document.getElementById('sustentoCosto').value
-        };
-
-        proceso.costosData = updatedData;
-        
-        appData.updateProcess(proceso);
-
-        alert('Datos de Costos guardados exitosamente.');
-        console.log('Datos de Costos guardados:', proceso);
     }
 
     return {
         init: (procesoId, containerElement) => {
-            currentProcesoId = procesoId;
             moduleContainer = containerElement;
+            if (typeof appData === 'undefined') {
+                console.error('Costos: appData no está definido al inicializar.');
+                if (moduleContainer) {
+                    moduleContainer.innerHTML = '<p class="alert alert-danger">Error: Datos de la aplicación no disponibles.</p>';
+                }
+                return;
+            }
+            currentProceso = appData.getProcess(procesoId);
+            if (!currentProceso) {
+                console.error('Costos: Proceso no encontrado con ID:', procesoId);
+                if (moduleContainer) {
+                    moduleContainer.innerHTML = `<p class="alert alert-warning">Proceso con ID "${procesoId}" no encontrado para el módulo de Costos.</p>`;
+                }
+                return;
+            }
+            console.log('Costos: init() llamado para proceso:', currentProceso);
             render();
         }
     };
