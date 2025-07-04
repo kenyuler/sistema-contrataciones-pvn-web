@@ -1,6 +1,7 @@
 // js/data.js
 
-const appData = (() => {
+// Definir appData directamente en el objeto global (window en navegadores)
+window.appData = (() => { // Usamos IIFE para el contenido interno, pero asignamos a window.appData
     const LOCAL_STORAGE_KEY = 'sistemaContratacionesData';
     const DEFAULT_CONFIG = {
         lists: {
@@ -193,7 +194,7 @@ const appData = (() => {
 
     function getProcess(id) {
         if (typeof id === 'string') {
-            return data.procesos.find(p => p.id === id); 
+            return data.procesos.find(p => p.id === id);
         }
         // Si el ID es numérico, asume que es el índice para compatibilidad o testing
         return data.procesos[id];
@@ -205,7 +206,7 @@ const appData = (() => {
         newProcess.estado = newProcess.estado || 'Pendiente'; // Estado por defecto
         newProcess.fechaInicio = newProcess.fechaInicio || new Date().toISOString().split('T')[0]; // Fecha actual
         newProcess.currentModule = newProcess.currentModule || 'requerimiento'; // Módulo inicial al crear
-        
+
         // Inicializar sub-objetos de módulos si no existen
         newProcess.requerimiento = newProcess.requerimiento || {};
         newProcess.areaUsuaria = newProcess.areaUsuaria || {};
