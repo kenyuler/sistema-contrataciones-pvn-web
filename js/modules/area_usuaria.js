@@ -1,106 +1,115 @@
 // js/modules/area_usuaria.js
 
 const areaUsuariaModule = (() => {
-    let currentProcesoId = null;
     let moduleContainer = null;
+    let currentProceso = null;
 
     function render() {
-        const proceso = appData.getProcess(currentProcesoId);
-        if (!proceso) {
-            moduleContainer.innerHTML = '<p class="alert alert-danger">Proceso no encontrado para cargar Área Usuaria.</p>';
+        if (!moduleContainer) {
+            console.error('Area Usuaria: moduleContainer es null. No se puede renderizar.');
+            return;
+        }
+        if (!currentProceso) {
+            moduleContainer.innerHTML = '<p class="alert alert-warning">No se ha especificado un proceso para el área usuaria.</p>';
             return;
         }
 
-        const data = proceso.areaUsuariaData || {};
+        const config = appData.getConfig();
+        const areasResponsablesOptions = config.lists.areasResponsables.map(area => `<option value="${area}" ${currentProceso.areaUsuaria.responsable === area ? 'selected' : ''}>${area}</option>`).join('');
 
-        let html = `
-            <div class="card mt-3">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <span>Módulo de Área Usuaria para: <strong class="text-primary">${proceso.nombre}</strong></span>
-                    <button class="btn btn-secondary btn-sm" id="back-to-process-detail">← Volver al Proceso</button>
+        // Extraer fecha para el campo de selección
+        const fechaEntregaROM = currentProceso.areaUsuaria.fechaEntregaROM ? new Date(currentProceso.areaUsuaria.fechaEntregaROM) : null;
+
+        moduleContainer.innerHTML = `
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Datos de Área Usuaria para ${currentProceso.nombre || 'Nuevo Proceso'}</h5>
                 </div>
                 <div class="card-body">
                     <form id="area-usuaria-form">
-                        <h5 class="form-title mb-4">Detalles de Área Usuaria</h5>
-
                         <div class="mb-3">
-                            <label for="responsableArea" class="form-label">Responsable del Área Usuaria:</label>
-                            <input type="text" class="form-control" id="responsableArea" value="${data.responsable || ''}" placeholder="Ej: Juan Pérez">
+                            <label for="au-responsable" class="form-label">Responsable del Área Usuaria</label>
+                            <select class="form-select" id="au-responsable" required>
+                                <option value="">Seleccione Responsable</option>
+                                ${areasResponsablesOptions}
+                            </select>
                         </div>
-
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="fechaEntregaRqm" class="form-label">Fecha de Entrega del Requerimiento:</label>
-                                <input type="date" class="form-control" id="fechaEntregaRqm" value="${data.fechaEntregaRqm || ''}">
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label for="conformidadRqm" class="form-label">Conformidad del Requerimiento:</label>
-                                <select class="form-select" id="conformidadRqm">
-                                    <option value="">Seleccione</option>
-                                    <option value="Conforme" ${data.conformidadRqm === 'Conforme' ? 'selected' : ''}>Conforme</option>
-                                    <option value="No Conforme" ${data.conformidadRqm === 'No Conforme' ? 'selected' : ''}>No Conforme</option>
-                                    <option value="Observado" ${data.conformidadRqm === 'Observado' ? 'selected' : ''}>Observado</option>
-                                </select>
-                            </div>
-                        </div>
-
                         <div class="mb-3">
-                            <label for="observacionesArea" class="form-label">Observaciones del Área Usuaria:</label>
-                            <textarea class="form-control" id="observacionesArea" rows="3" placeholder="Observaciones o comentarios...">${data.observaciones || ''}</textarea>
+                            <label for="au-fecha-entrega-rom" class="form-label">Fecha de Entrega de Requerimiento (ROM)</label>
+                            <input type="date" class="form-control" id="au-fecha-entrega-rom" value="${fechaEntregaROM ? fechaEntregaROM.toISOString().split('T')[0] : ''}">
+                        </div>
+                        <div class="mb-3">
+                            <label for="au-observaciones" class="form-label">Observaciones</label>
+                            <textarea class="form-control" id="au-observaciones" rows="3">${currentProceso.areaUsuaria.observaciones || ''}</textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="au-conformidad-rom" class="form-label">Conformidad con ROM</label>
+                            <select class="form-select" id="au-conformidad-rom">
+                                <option value="">Seleccione</option>
+                                <option value="Conforme" ${currentProceso.areaUsuaria.conformidadROM === 'Conforme' ? 'selected' : ''}>Conforme</option>
+                                <option value="Pendiente" ${currentProceso.areaUsuaria.conformidadROM === 'Pendiente' ? 'selected' : ''}>Pendiente</option>
+                                <option value="Observado" ${currentProceso.areaUsuaria.conformidadROM === 'Observado' ? 'selected' : ''}>Observado</option>
+                            </select>
                         </div>
                         
-                        <div class="mb-3">
-                            <label for="fechaConformidad" class="form-label">Fecha de Conformidad del Requerimiento:</label>
-                            <input type="date" class="form-control" id="fechaConformidad" value="${data.fechaConformidad || ''}">
-                        </div>
-
-                        <button type="submit" class="btn btn-primary mt-4" id="save-area-usuaria-btn">Guardar Datos de Área Usuaria</button>
+                        <button type="submit" class="btn btn-primary"><i class="bi bi-save me-2"></i>Guardar Área Usuaria</button>
                     </form>
                 </div>
             </div>
         `;
-        moduleContainer.innerHTML = html;
-
-        moduleContainer.querySelector('#area-usuaria-form').addEventListener('submit', saveAreaUsuaria);
-        
-        moduleContainer.querySelector('#back-to-process-detail').addEventListener('click', () => {
-            if (typeof app !== 'undefined' && app.loadModule) {
-                app.loadModule('seguimiento', currentProcesoId); // Volver al módulo de seguimiento y al detalle del proceso
-            } else {
-                console.error('app.loadModule no está disponible.');
-            }
-        });
+        setupEventListeners();
     }
 
-    function saveAreaUsuaria(event) {
-        event.preventDefault();
+    function setupEventListeners() {
+        if (!moduleContainer) return;
 
-        const proceso = appData.getProcess(currentProcesoId);
-        if (!proceso) {
-            console.error('Proceso no encontrado al intentar guardar datos de Área Usuaria.');
-            return;
+        const form = moduleContainer.querySelector('#area-usuaria-form');
+        if (form) {
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                console.log('Area Usuaria: Guardando datos del área usuaria...');
+
+                const updatedProceso = {
+                    ...currentProceso,
+                    areaUsuaria: {
+                        responsable: document.getElementById('au-responsable').value,
+                        fechaEntregaROM: document.getElementById('au-fecha-entrega-rom').value,
+                        observaciones: document.getElementById('au-observaciones').value,
+                        conformidadROM: document.getElementById('au-conformidad-rom').value
+                    }
+                };
+                
+                if (typeof appData !== 'undefined' && typeof appData.updateProcess === 'function') {
+                    appData.updateProcess(updatedProceso);
+                    alert('Datos de área usuaria guardados exitosamente!');
+                    currentProceso = appData.getProcess(currentProceso.id); // Actualizar el currentProceso localmente
+                } else {
+                    console.error('Area Usuaria: appData o appData.updateProcess no están disponibles.');
+                    alert('Hubo un error al guardar los datos del área usuaria.');
+                }
+            });
         }
-
-        const updatedData = {
-            responsable: document.getElementById('responsableArea').value,
-            fechaEntregaRqm: document.getElementById('fechaEntregaRqm').value,
-            conformidadRqm: document.getElementById('conformidadRqm').value,
-            observaciones: document.getElementById('observacionesArea').value,
-            fechaConformidad: document.getElementById('fechaConformidad').value
-        };
-
-        proceso.areaUsuariaData = updatedData;
-        
-        appData.updateProcess(proceso);
-
-        alert('Datos de Área Usuaria guardados exitosamente.');
-        console.log('Datos de Área Usuaria guardados:', proceso);
     }
 
     return {
         init: (procesoId, containerElement) => {
-            currentProcesoId = procesoId;
             moduleContainer = containerElement;
+            if (typeof appData === 'undefined') {
+                console.error('Area Usuaria: appData no está definido al inicializar.');
+                if (moduleContainer) {
+                    moduleContainer.innerHTML = '<p class="alert alert-danger">Error: Datos de la aplicación no disponibles.</p>';
+                }
+                return;
+            }
+            currentProceso = appData.getProcess(procesoId);
+            if (!currentProceso) {
+                console.error('Area Usuaria: Proceso no encontrado con ID:', procesoId);
+                if (moduleContainer) {
+                    moduleContainer.innerHTML = `<p class="alert alert-warning">Proceso con ID "${procesoId}" no encontrado para el módulo de Área Usuaria.</p>`;
+                }
+                return;
+            }
+            console.log('Area Usuaria: init() llamado para proceso:', currentProceso);
             render();
         }
     };
