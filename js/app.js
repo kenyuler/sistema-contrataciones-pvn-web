@@ -1,10 +1,13 @@
 // js/app.js
 
-const app = (() => {
+// Definir app directamente en el objeto global (window en navegadores)
+window.app = (() => { // Usamos IIFE para el contenido interno, pero asignamos a window.app
     // Referencia al contenedor principal donde se cargará el contenido de los módulos
-    let contentContainer = null; 
+    let contentContainer = null;
 
     // Mapeo de módulos cargados. Se usa typeof para asegurar que el módulo ha sido cargado.
+    // Se asume que las variables de módulo (ej. dashboardModule) existen globalmente
+    // después de cargar sus respectivos scripts.
     const modules = {
         'dashboard': typeof dashboardModule !== 'undefined' ? dashboardModule : null,
         'seguimiento': typeof seguimientoModule !== 'undefined' ? seguimientoModule : null,
@@ -55,12 +58,9 @@ const app = (() => {
      */
     function loadModule(moduleName, currentProcesoId = null) {
         console.log(`app: Intentando cargar el módulo: ${moduleName}`);
-        const module = modules[moduleName];
+        const module = modules[moduleName]; // Obtener el módulo del mapeo
 
         // *** VERIFICACIÓN CRÍTICA DEL CONTENEDOR ***
-        // Asegurarse de que contentContainer está inicializado ANTES de usarlo
-        // Esto es una capa de seguridad si init() no lo obtuvo por alguna razón,
-        // o si un módulo intenta cargarse antes de que el DOM esté listo.
         if (!contentContainer) {
             contentContainer = document.getElementById('content-container');
             if (!contentContainer) {
@@ -77,9 +77,9 @@ const app = (() => {
             console.log(`app: Módulo '${moduleName}' encontrado y tiene método init.`);
             // Mostrar un spinner mientras se carga el módulo
             contentContainer.innerHTML = '<div class="d-flex justify-content-center align-items-center" style="min-height: 300px;"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Cargando...</span></div></div>';
-            
+
             // Llamar al método init del módulo, pasándole el ID del proceso si aplica y el contenedor
-            console.log(`app: Pasando contentContainer a ${moduleName}.init():`, contentContainer); 
+            console.log(`app: Pasando currentProcesoId: ${currentProcesoId} y contentContainer a ${moduleName}.init():`, contentContainer);
             module.init(currentProcesoId, contentContainer); // Pasamos el ID y el contenedor
             updateActiveNavLink(moduleName); // Actualizar la navegación
             console.log(`app: Módulo '${moduleName}' cargado exitosamente.`);
@@ -93,7 +93,7 @@ const app = (() => {
     return {
         init: () => {
             console.log('app: Iniciando aplicación.');
-            
+
             // Obtener el contenedor principal una vez al inicio
             contentContainer = document.getElementById('content-container');
             if (!contentContainer) {
@@ -106,15 +106,12 @@ const app = (() => {
 
             // Asegúrate de que appData se cargue y esté disponible.
             // data.js debe cargarse ANTES de app.js en index.html.
-            if (typeof appData === 'undefined') {
+            if (typeof window.appData === 'undefined') { // Ahora verificamos window.appData
                 console.error('app: FATAL ERROR: appData no está definido. data.js no se cargó correctamente o en el orden adecuado.');
                 alert('Error crítico: Los datos de la aplicación no están disponibles. Por favor, recarga la página.');
                 return;
             }
             // appData.load() ya se llama dentro de data.js al inicializarse.
-            // Una llamada explícita aquí asegura que los datos se carguen,
-            // pero si data.js se ejecuta primero, ya debería haber sucedido.
-            // appData.load(); // Descomentar si appData no carga los datos automáticamente
             console.log('app: appData disponible.');
 
             // Inicializar eventos de navegación
@@ -122,7 +119,7 @@ const app = (() => {
             console.log('app: Eventos de navegación configurados.');
 
             // Cargar el dashboard por defecto al iniciar la aplicación
-            loadModule('dashboard'); 
+            loadModule('dashboard');
         }
     };
 })();
