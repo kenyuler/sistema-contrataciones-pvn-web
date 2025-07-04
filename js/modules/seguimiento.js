@@ -1,31 +1,58 @@
 // js/modules/seguimiento.js
 
 const seguimientoModule = (() => {
-    let moduleContainer = null; 
-    let currentProcesoId = null; 
+    let moduleContainer = null;
+    let currentProcessId = null; // Para el proceso que se está viendo/editando
+    let currentModuleView = 'list'; // 'list' o 'detail'
 
+    /**
+     * Renderiza la interfaz de usuario principal del módulo de seguimiento.
+     */
     function render() {
-        if (!moduleContainer) { 
-            console.error('Seguimiento: moduleContainer es undefined o null en render(). Esto no debería pasar si init() se llamó correctamente.');
+        if (!moduleContainer) {
+            console.error('Seguimiento: moduleContainer es null o undefined en render(). El módulo no se inicializó correctamente.');
             return;
         }
-        moduleContainer.innerHTML = ''; 
-        console.log('Seguimiento: Iniciando render(). currentProcesoId:', currentProcesoId);
+        moduleContainer.innerHTML = ''; // Limpiar el contenido anterior
 
-        if (currentProcesoId) {
-            renderProcessDetail();
+        if (currentModuleView === 'list') {
+            renderProcessList(moduleContainer);
+        } else if (currentModuleView === 'detail' && currentProcessId) {
+            renderProcessDetail(moduleContainer, currentProcessId);
         } else {
-            renderProcessList();
+            console.warn('Seguimiento: Vista no reconocida o ID de proceso faltante para detalle.');
+            renderProcessList(moduleContainer); // Volver a la lista por defecto
         }
+        setupEventListeners(); // Re-configurar listeners cada vez que se renderiza
     }
 
-    function renderProcessList() {
-        console.log('Seguimiento: Renderizando lista de procesos.');
-        let html = `
+    /**
+     * Renderiza la vista de lista de procesos.
+     * @param {HTMLElement} container - El contenedor donde se renderizará la lista.
+     */
+    function renderProcessList(container) {
+        if (!container) return; // Asegurar que el contenedor existe
+
+        // Asegúrate de que appData está disponible
+        if (typeof appData === 'undefined') {
+            console.error('Seguimiento: appData no está definido. No se pueden cargar los procesos.');
+            container.innerHTML = '<p class="alert alert-danger">Error: Datos de la aplicación no disponibles. Por favor, recarga la página.</p>';
+            return;
+        }
+
+        const procesos = appData.getProcesos(); // Obtener todos los procesos
+
+        container.innerHTML = `
             <div class="d-flex justify-content-between align-items-center mb-3">
-                <h2 class="mb-0 text-primary">Seguimiento de Procesos de Contratación</h2>
+                <h2 class="mb-0 text-primary">Listado de Procesos de Contratación</h2>
                 <button class="btn btn-success" id="new-process-btn"><i class="bi bi-plus-circle me-2"></i>Nuevo Proceso</button>
             </div>
+
+            <div class="input-group mb-3">
+                <input type="text" class="form-control" id="search-input" placeholder="Buscar por ID o nombre...">
+                <button class="btn btn-outline-secondary" type="button" id="clear-search-btn">X</button>
+            </div>
+
             <div class="table-responsive">
                 <table class="table table-hover table-striped">
                     <thead class="table-dark">
@@ -38,296 +65,259 @@ const seguimientoModule = (() => {
                             <th>Acciones</th>
                         </tr>
                     </thead>
-                    <tbody id="processes-table-body">
-                        <!-- Process rows will be inserted here -->
-                    </tbody>
+                    <tbody id="seguimiento-processes-table-body">
+                        </tbody>
                 </table>
             </div>
         `;
-        moduleContainer.innerHTML = html;
 
-        const processes = appData.procesos || []; 
-        console.log('Seguimiento: appData.procesos al renderizar lista:', processes);
+        const tableBody = container.querySelector('#seguimiento-processes-table-body');
+        const searchInput = container.querySelector('#search-input');
+        const clearSearchBtn = container.querySelector('#clear-search-btn');
 
-        const tableBody = moduleContainer.querySelector('#processes-table-body');
-        
-        if (!tableBody) {
-            console.error('Seguimiento: Elemento #processes-table-body no encontrado en el DOM.');
-            return; 
-        }
-
-        if (processes.length === 0) {
-            tableBody.innerHTML = `<tr><td colspan="6" class="text-center">No hay procesos registrados.</td></tr>`;
-            console.warn('Seguimiento: No hay procesos para mostrar.');
-        } else {
-            processes.forEach(proceso => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${proceso.id}</td>
-                    <td>${proceso.nombre}</td>
-                    <td><span class="badge bg-${getBadgeClass(proceso.estado)}">${proceso.estado || 'N/A'}</span></td>
-                    <td>${proceso.tipoContratacion || 'N/A'}</td>
-                    <td>${proceso.fechaInicio || 'N/A'}</td>
-                    <td>
-                        <button class="btn btn-info btn-sm view-process-btn" data-id="${proceso.id}"><i class="bi bi-eye"></i> Ver</button>
-                        <button class="btn btn-danger btn-sm delete-process-btn" data-id="${proceso.id}"><i class="bi bi-trash"></i> Eliminar</button>
-                    </td>
-                `;
-                tableBody.appendChild(row);
-            });
-            console.log(`Seguimiento: ${processes.length} procesos renderizados en la tabla.`);
-        }
-
-        moduleContainer.querySelector('#new-process-btn').addEventListener('click', () => {
-            console.log('Seguimiento: Botón Nuevo Proceso clicado. Creando nuevo proceso y mostrando detalle.');
-            if (typeof appData !== 'undefined' && typeof appData.createProcess === 'function') {
-                const newProcess = appData.createProcess();
-                console.log('Seguimiento: Nuevo proceso creado:', newProcess);
-                currentProcesoId = newProcess.id;
-                renderProcessDetail(); 
-            } else {
-                console.error("Error: appData.createProcess no está disponible al crear proceso desde seguimiento.");
-                alert("Hubo un error al iniciar un nuevo proceso. Inténtalo de nuevo.");
+        // Función para filtrar y mostrar procesos
+        const displayProcesses = (filterText = '') => {
+            let filteredProcesses = procesos;
+            if (filterText) {
+                const lowerCaseFilter = filterText.toLowerCase();
+                filteredProcesses = procesos.filter(p =>
+                    (p.id && p.id.toLowerCase().includes(lowerCaseFilter)) ||
+                    (p.nombre && p.nombre.toLowerCase().includes(lowerCaseFilter))
+                );
             }
-        });
 
-        moduleContainer.querySelectorAll('.view-process-btn').forEach(button => {
-            button.addEventListener('click', (e) => {
-                const id = parseInt(e.currentTarget.dataset.id);
-                console.log('Seguimiento: Botón Ver Proceso clicado para ID:', id);
-                currentProcesoId = id;
-                renderProcessDetail();
-            });
-        });
+            if (tableBody) {
+                tableBody.innerHTML = ''; // Limpiar la tabla antes de renderizar
 
-        moduleContainer.querySelectorAll('.delete-process-btn').forEach(button => {
-            button.addEventListener('click', (e) => {
-                const id = parseInt(e.currentTarget.dataset.id);
-                console.log('Seguimiento: Botón Eliminar Proceso clicado para ID:', id);
-                if (confirm('¿Estás seguro de que quieres eliminar este proceso? Esta acción no se puede deshacer.')) {
-                    appData.deleteProcess(id);
-                    console.log('Seguimiento: Proceso eliminado. Recargando lista.');
-                    renderProcessList();
+                if (filteredProcesses.length === 0) {
+                    console.log('Seguimiento: No hay procesos para mostrar.');
+                    tableBody.innerHTML = `<tr><td colspan="6" class="text-center">No hay procesos registrados o coinciden con la búsqueda.</td></tr>`;
+                    return;
                 }
-            });
-        });
-    }
 
-    function renderProcessDetail() {
-        console.log('Seguimiento: Renderizando detalle del proceso ID:', currentProcesoId);
-        const proceso = appData.getProcess(currentProcesoId);
-
-        if (!proceso) {
-            moduleContainer.innerHTML = '<p class="alert alert-danger">Proceso no encontrado. <button class="btn btn-primary btn-sm" id="back-to-list-btn">Volver a la lista</button></p>';
-            moduleContainer.querySelector('#back-to-list-btn').addEventListener('click', () => {
-                currentProcesoId = null;
-                renderProcessList();
-            });
-            console.error('Seguimiento: Proceso no encontrado con ID:', currentProcesoId);
-            return;
-        }
-
-        const modulesConfig = {
-            'requerimiento': {
-                name: 'Requerimiento',
-                variable: typeof requerimientoModule !== 'undefined' ? requerimientoModule : null
-            },
-            'area_usuaria': {
-                name: 'Área Usuaria',
-                variable: typeof areaUsuariaModule !== 'undefined' ? areaUsuariaModule : null
-            },
-            'segmentacion': {
-                name: 'Segmentación',
-                variable: typeof segmentacionModule !== 'undefined' ? segmentacionModule : null
-            },
-            'costos': {
-                name: 'Costos y Presupuesto',
-                variable: typeof costosModule !== 'undefined' ? costosModule : null
-            },
-            'estrategia': {
-                name: 'Estrategia de Contratación',
-                variable: typeof estrategiaModule !== 'undefined' ? estrategiaModule : null
+                filteredProcesses.forEach(proceso => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${proceso.id || 'N/A'}</td>
+                        <td>${proceso.nombre || 'N/A'}</td>
+                        <td><span class="badge bg-${getBadgeClass(proceso.estado)}">${proceso.estado || 'N/A'}</span></td>
+                        <td>${proceso.tipoContratacion || 'N/A'}</td>
+                        <td>${proceso.fechaInicio || 'N/A'}</td>
+                        <td>
+                            <button class="btn btn-info btn-sm view-process-btn" data-id="${proceso.id}"><i class="bi bi-eye"></i> Ver</button>
+                            <button class="btn btn-danger btn-sm delete-process-btn" data-id="${proceso.id}"><i class="bi bi-trash"></i> Eliminar</button>
+                        </td>
+                    `;
+                    tableBody.appendChild(row);
+                });
             }
         };
 
-        let moduleTabsHtml = '';
-        let moduleContentHtml = '';
+        // Renderizar procesos inicialmente
+        displayProcesses();
 
-        for (const key in modulesConfig) {
-            const module = modulesConfig[key];
-            if (module.variable && typeof module.variable.init === 'function') {
-                const isActive = (proceso.currentModule === key || (proceso.currentModule === undefined && key === 'requerimiento')) ? 'active' : '';
-                const isShow = isActive ? 'show active' : '';
-
-                moduleTabsHtml += `<li class="nav-item">
-                                    <button class="nav-link ${isActive}" id="tab-${key}" data-bs-toggle="tab" data-bs-target="#content-${key}" type="button" role="tab" aria-controls="content-${key}" aria-selected="${isActive ? 'true' : 'false'}">${module.name}</button>
-                                </li>`;
-                moduleContentHtml += `<div class="tab-pane fade ${isShow}" id="content-${key}" role="tabpanel" aria-labelledby="tab-${key}">
-                                        <div class="module-placeholder" data-module="${key}"></div>
-                                    </div>`;
-            } else {
-                console.warn(`Seguimiento: Módulo ${key} no encontrado o no tiene método init. No se añadirá a las pestañas.`);
-            }
+        // Event listeners para la búsqueda
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                displayProcesses(e.target.value);
+            });
         }
-        
-        let html = `
-            <div class="card mt-3">
-                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                    <h3 class="mb-0">Detalle del Proceso: ${proceso.nombre} (ID: ${proceso.id})</h3>
-                    <button class="btn btn-secondary" id="back-to-list-btn"><i class="bi bi-arrow-left"></i> Volver a la Lista</button>
+        if (clearSearchBtn) {
+            clearSearchBtn.addEventListener('click', () => {
+                if (searchInput) {
+                    searchInput.value = '';
+                    displayProcesses('');
+                }
+            });
+        }
+    }
+
+    /**
+     * Renderiza la vista de detalle de un proceso específico.
+     * @param {HTMLElement} container - El contenedor donde se renderizará el detalle.
+     * @param {string} id - El ID del proceso a mostrar.
+     */
+    function renderProcessDetail(container, id) {
+        if (!container) return; // Asegurar que el contenedor existe
+
+        // Asegúrate de que appData está disponible
+        if (typeof appData === 'undefined') {
+            console.error('Seguimiento: appData no está definido. No se pueden cargar los detalles del proceso.');
+            container.innerHTML = '<p class="alert alert-danger">Error: Datos de la aplicación no disponibles. Por favor, recarga la página.</p>';
+            return;
+        }
+
+        const proceso = appData.getProcess(id); // Obtener el proceso por ID
+
+        if (!proceso) {
+            container.innerHTML = `<p class="alert alert-warning">Proceso con ID "${id}" no encontrado.</p>`;
+            return;
+        }
+
+        // Determinar el módulo actual del proceso para resaltar la pestaña
+        const activeModule = proceso.currentModule || 'requerimiento';
+
+        container.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2 class="mb-0 text-primary">Detalles del Proceso: ${proceso.nombre || 'Sin Nombre'}</h2>
+                <button class="btn btn-secondary" id="back-to-list-btn"><i class="bi bi-arrow-left me-2"></i>Volver a la Lista</button>
+            </div>
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">Información General</h5>
                 </div>
                 <div class="card-body">
-                    <form id="process-detail-form">
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label for="process-name" class="form-label">Nombre del Proceso:</label>
-                                <input type="text" class="form-control" id="process-name" value="${proceso.nombre || ''}" placeholder="Ej: Adquisición de Equipos de Cómputo">
-                            </div>
-                            <div class="col-md-3">
-                                <label for="process-type" class="form-label">Tipo de Contratación:</label>
-                                <select class="form-select" id="process-type">
-                                    <option value="">Seleccione Tipo</option>
-                                    ${appData.getConfig().lists.tiposContratacion.map(tipo => `<option value="${tipo}" ${proceso.tipoContratacion === tipo ? 'selected' : ''}>${tipo}</option>`).join('')}
-                                </select>
-                            </div>
-                            <div class="col-md-3">
-                                <label for="process-state" class="form-label">Estado:</label>
-                                <select class="form-select" id="process-state">
-                                    <option value="">Seleccione Estado</option>
-                                    ${appData.getConfig().lists.estadosProceso.map(estado => `<option value="${estado}" ${proceso.estado === estado ? 'selected' : ''}>${estado}</option>`).join('')}
-                                </select>
-                            </div>
-                        </div>
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label for="process-start-date" class="form-label">Fecha de Inicio:</label>
-                                <input type="date" class="form-control" id="process-start-date" value="${proceso.fechaInicio || ''}">
-                            </div>
-                            <div class="col-md-6">
-                                <label for="process-end-date" class="form-label">Fecha de Fin Estimada:</label>
-                                <input type="date" class="form-control" id="process-end-date" value="${proceso.fechaFinEstimada || ''}">
-                            </div>
-                        </div>
-                        <div class="mb-3">
-                            <label for="process-description" class="form-label">Descripción:</label>
-                            <textarea class="form-control" id="process-description" rows="3" placeholder="Descripción breve del proceso...">${proceso.descripcion || ''}</textarea>
-                        </div>
-                        <button type="submit" class="btn btn-primary" id="save-process-details-btn"><i class="bi bi-save me-2"></i>Guardar Detalles del Proceso</button>
-                    </form>
+                    <p><strong>ID:</strong> ${proceso.id || 'N/A'}</p>
+                    <p><strong>Nombre:</strong> ${proceso.nombre || 'N/A'}</p>
+                    <p><strong>Objeto de Contratación:</strong> ${proceso.tipoContratacion || 'N/A'}</p>
+                    <p><strong>Estado:</strong> <span class="badge bg-${getBadgeClass(proceso.estado)}">${proceso.estado || 'N/A'}</span></p>
+                    <p><strong>Fecha Inicio:</strong> ${proceso.fechaInicio || 'N/A'}</p>
+                    <p><strong>Descripción:</strong> ${proceso.descripcion || 'N/A'}</p>
                 </div>
             </div>
 
-            <div class="card mt-4">
-                <div class="card-header bg-secondary text-white">
-                    <h4 class="mb-0">Etapas del Proceso</h4>
-                </div>
-                <div class="card-body">
-                    <ul class="nav nav-tabs" id="process-tabs" role="tablist">
-                        ${moduleTabsHtml}
-                    </ul>
-                    <div class="tab-content mt-3" id="process-tab-content">
-                        ${moduleContentHtml}
-                    </div>
-                </div>
+            <h3 class="mt-4 mb-3 text-secondary">Etapas del Proceso</h3>
+            <ul class="nav nav-tabs" id="processTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link ${activeModule === 'requerimiento' ? 'active' : ''}" id="tab-requerimiento" data-bs-toggle="tab" data-bs-target="#content-requerimiento" type="button" role="tab" aria-controls="content-requerimiento" aria-selected="${activeModule === 'requerimiento'}">Requerimiento</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link ${activeModule === 'area_usuaria' ? 'active' : ''}" id="tab-area-usuaria" data-bs-toggle="tab" data-bs-target="#content-area-usuaria" type="button" role="tab" aria-controls="content-area-usuaria" aria-selected="${activeModule === 'area_usuaria'}">Área Usuaria</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link ${activeModule === 'segmentacion' ? 'active' : ''}" id="tab-segmentacion" data-bs-toggle="tab" data-bs-target="#content-segmentacion" type="button" role="tab" aria-controls="content-segmentacion" aria-selected="${activeModule === 'segmentacion'}">Segmentación</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link ${activeModule === 'costos' ? 'active' : ''}" id="tab-costos" data-bs-toggle="tab" data-bs-target="#content-costos" type="button" role="tab" aria-controls="content-costos" aria-selected="${activeModule === 'costos'}">Costos</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link ${activeModule === 'estrategia' ? 'active' : ''}" id="tab-estrategia" data-bs-toggle="tab" data-bs-target="#content-estrategia" type="button" role="tab" aria-controls="content-estrategia" aria-selected="${activeModule === 'estrategia'}">Estrategia</button>
+                </li>
+            </ul>
+            <div class="tab-content" id="processTabContent">
+                <div class="tab-pane fade ${activeModule === 'requerimiento' ? 'show active' : ''}" id="content-requerimiento" role="tabpanel" aria-labelledby="tab-requerimiento"></div>
+                <div class="tab-pane fade ${activeModule === 'area_usuaria' ? 'show active' : ''}" id="content-area-usuaria" role="tabpanel" aria-labelledby="tab-area-usuaria"></div>
+                <div class="tab-pane fade ${activeModule === 'segmentacion' ? 'show active' : ''}" id="content-segmentacion" role="tabpanel" aria-labelledby="tab-segmentacion"></div>
+                <div class="tab-pane fade ${activeModule === 'costos' ? 'show active' : ''}" id="content-costos" role="tabpanel" aria-labelledby="tab-costos"></div>
+                <div class="tab-pane fade ${activeModule === 'estrategia' ? 'show active' : ''}" id="content-estrategia" role="tabpanel" aria-labelledby="tab-estrategia"></div>
             </div>
         `;
-        moduleContainer.innerHTML = html;
 
-        moduleContainer.querySelector('#process-detail-form').addEventListener('submit', saveProcessDetails);
-        
-        moduleContainer.querySelector('#back-to-list-btn').addEventListener('click', () => {
-            console.log('Seguimiento: Botón Volver a la Lista clicado. Reseteando ID y renderizando lista.');
-            currentProcesoId = null; 
-            renderProcessList(); 
-        });
+        // Cargar el contenido del módulo inicial
+        loadSubModule(activeModule, id);
 
-        let initialModuleKey = proceso.currentModule;
-        if (!initialModuleKey || !modulesConfig[initialModuleKey]?.variable) {
-            initialModuleKey = Object.keys(modulesConfig).find(key => modulesConfig[key].variable && typeof modulesConfig[key].variable.init === 'function');
-        }
-
-        if (initialModuleKey) {
-            const tabButton = moduleContainer.querySelector(`#tab-${initialModuleKey}`);
-            const tabContent = moduleContainer.querySelector(`#content-${initialModuleKey}`);
-            if (tabButton && tabContent) {
-                tabButton.classList.add('active');
-                tabContent.classList.add('show', 'active');
-            }
-            console.log('Seguimiento: Cargando módulo inicial:', initialModuleKey);
-            loadModuleContent(initialModuleKey, `content-${initialModuleKey}`);
-        } else {
-            console.warn('Seguimiento: No hay módulos disponibles para cargar en el detalle del proceso.');
-        }
-
-        moduleContainer.querySelectorAll('.nav-link').forEach(tabButton => {
+        // Configurar listeners para las pestañas
+        container.querySelectorAll('#processTabs .nav-link').forEach(tabButton => {
             tabButton.addEventListener('shown.bs.tab', function (event) {
-                const moduleKey = event.target.id.replace('tab-', '');
-                const targetId = event.target.dataset.bsTarget.replace('#', '');
-                
-                const updatedProceso = appData.getProcess(currentProcesoId);
-                if (updatedProceso) {
-                    updatedProceso.currentModule = moduleKey;
-                    appData.updateProcess(updatedProceso); 
-                    console.log('Seguimiento: Módulo activo del proceso actualizado a:', moduleKey);
-                }
-                
-                loadModuleContent(moduleKey, targetId);
+                const targetId = event.target.dataset.bsTarget.replace('#content-', ''); // Obtener el nombre del módulo (ej. 'requerimiento')
+                loadSubModule(targetId, id);
+                // Actualizar el currentModule del proceso en los datos (persistir la última pestaña abierta)
+                proceso.currentModule = targetId;
+                appData.updateProcess(proceso); // Guardar el cambio
             });
         });
     }
 
-    function loadModuleContent(moduleKey, containerId) {
-        console.log(`Seguimiento: Intentando cargar contenido para el módulo ${moduleKey} en #${containerId}`);
-        const modulePlaceholder = moduleContainer.querySelector(`#${containerId} .module-placeholder`);
-        if (!modulePlaceholder) {
-            console.error(`Seguimiento: Contenedor para el módulo ${moduleKey} no encontrado.`);
+    /**
+     * Carga el contenido de un submódulo (pestaña) dentro del detalle del proceso.
+     * @param {string} subModuleName - El nombre del submódulo (ej. 'requerimiento').
+     * @param {string} procesoId - El ID del proceso actual.
+     */
+    function loadSubModule(subModuleName, procesoId) {
+        const subModuleContainer = moduleContainer.querySelector(`#content-${subModuleName}`);
+        if (!subModuleContainer) {
+            console.error(`Seguimiento: Contenedor para submódulo '${subModuleName}' no encontrado.`);
             return;
         }
 
-        const modulesConfig = {
-            'requerimiento': { name: 'Requerimiento', variable: typeof requerimientoModule !== 'undefined' ? requerimientoModule : null },
-            'area_usuaria': { name: 'Área Usuaria', variable: typeof areaUsuariaModule !== 'undefined' ? areaUsuariaModule : null },
-            'segmentacion': { name: 'Segmentación', variable: typeof segmentacionModule !== 'undefined' ? segmentacionModule : null },
-            'costos': { name: 'Costos y Presupuesto', variable: typeof costosModule !== 'undefined' ? costosModule : null },
-            'estrategia': { name: 'Estrategia de Contratación', variable: typeof estrategiaModule !== 'undefined' ? estrategiaModule : null }
+        // Mapeo de submódulos a objetos de módulo (debe coincidir con app.js modules)
+        const subModulesMap = {
+            'requerimiento': typeof requerimientoModule !== 'undefined' ? requerimientoModule : null,
+            'area_usuaria': typeof areaUsuariaModule !== 'undefined' ? areaUsuariaModule : null,
+            'segmentacion': typeof segmentacionModule !== 'undefined' ? segmentacionModule : null,
+            'costos': typeof costosModule !== 'undefined' ? costosModule : null,
+            'estrategia': typeof estrategiaModule !== 'undefined' ? estrategiaModule : null
         };
 
-        const module = modulesConfig[moduleKey];
-        if (module && module.variable && typeof module.variable.init === 'function') {
-            modulePlaceholder.innerHTML = ''; 
-            module.variable.init(currentProcesoId, modulePlaceholder);
-            console.log(`Seguimiento: Módulo ${moduleKey} inicializado.`);
+        const subModule = subModulesMap[subModuleName];
+
+        if (subModule && typeof subModule.init === 'function') {
+            console.log(`Seguimiento: Cargando submódulo: ${subModuleName} para proceso ${procesoId}`);
+            // Limpiar y mostrar spinner
+            subModuleContainer.innerHTML = '<div class="d-flex justify-content-center align-items-center" style="min-height: 200px;"><div class="spinner-border text-secondary" role="status"><span class="visually-hidden">Cargando...</span></div></div>';
+            subModule.init(procesoId, subModuleContainer); // Pasar el ID del proceso y el contenedor específico
         } else {
-            modulePlaceholder.innerHTML = `<p class="alert alert-warning">El módulo '${module?.name || moduleKey}' no pudo ser cargado o no tiene un método 'init' válido.</p>`;
-            console.error(`Seguimiento: No se pudo cargar el módulo de ${module?.name || moduleKey}.`);
+            console.error(`Seguimiento: Submódulo '${subModuleName}' no encontrado o no tiene método 'init'.`);
+            subModuleContainer.innerHTML = `<p class="alert alert-danger">Error: Submódulo '${subModuleName}' no disponible.</p>`;
         }
     }
 
-    function saveProcessDetails(event) {
-        event.preventDefault(); 
-        console.log('Seguimiento: Guardando detalles del proceso.');
 
-        const proceso = appData.getProcess(currentProcesoId);
-        if (!proceso) {
-            console.error('Seguimiento: Proceso no encontrado al intentar guardar detalles.');
-            return;
+    /**
+     * Configura los event listeners para los elementos del módulo de seguimiento.
+     */
+    function setupEventListeners() {
+        if (!moduleContainer) return; // Doble verificación
+
+        // Botón "Nuevo Proceso" en la vista de lista
+        const newProcessBtn = moduleContainer.querySelector('#new-process-btn');
+        if (newProcessBtn) {
+            newProcessBtn.addEventListener('click', () => {
+                console.log('Seguimiento: Clic en Nuevo Proceso.');
+                if (typeof appData !== 'undefined' && typeof appData.createProcess === 'function') {
+                    const newProcess = appData.createProcess(); // Crea el proceso
+                    currentProcessId = newProcess.id; // Establece el ID del nuevo proceso
+                    currentModuleView = 'detail'; // Cambia a vista de detalle
+                    render(); // Re-renderiza para mostrar el detalle del nuevo proceso
+                } else {
+                    console.error('Seguimiento: appData o appData.createProcess no están disponibles.');
+                    alert('Hubo un error al iniciar un nuevo proceso.');
+                }
+            });
         }
 
-        const updatedProcesoData = { ...proceso }; 
+        // Botones "Ver" proceso en la lista
+        moduleContainer.querySelectorAll('.view-process-btn').forEach(button => {
+            button.addEventListener('click', (e) => {
+                const id = e.currentTarget.dataset.id;
+                console.log('Seguimiento: Clic en Ver Proceso para ID:', id);
+                currentProcessId = id; // Guarda el ID del proceso
+                currentModuleView = 'detail'; // Cambia a vista de detalle
+                render(); // Re-renderiza para mostrar el detalle
+            });
+        });
 
-        updatedProcesoData.nombre = document.getElementById('process-name').value;
-        updatedProcesoData.tipoContratacion = document.getElementById('process-type').value;
-        updatedProcesoData.estado = document.getElementById('process-state').value;
-        updatedProcesoData.fechaInicio = document.getElementById('process-start-date').value;
-        updatedProcesoData.fechaFinEstimada = document.getElementById('process-end-date').value;
-        updatedProcesoData.descripcion = document.getElementById('process-description').value;
+        // Botones "Eliminar" proceso en la lista
+        moduleContainer.querySelectorAll('.delete-process-btn').forEach(button => {
+            button.addEventListener('click', (e) => {
+                const id = e.currentTarget.dataset.id;
+                if (confirm(`¿Estás seguro de que quieres eliminar el proceso ${id}?`)) {
+                    console.log('Seguimiento: Eliminando proceso con ID:', id);
+                    if (typeof appData !== 'undefined' && typeof appData.deleteProcess === 'function') {
+                        appData.deleteProcess(id);
+                        render(); // Re-renderiza la lista después de eliminar
+                    } else {
+                        console.error('Seguimiento: appData o appData.deleteProcess no están disponibles.');
+                        alert('Hubo un error al eliminar el proceso.');
+                    }
+                }
+            });
+        });
 
-        appData.updateProcess(updatedProcesoData);
-
-        alert('Detalles del proceso guardados exitosamente.');
-        console.log('Seguimiento: Proceso actualizado:', updatedProcesoData);
+        // Botón "Volver a la Lista" en la vista de detalle
+        const backToListBtn = moduleContainer.querySelector('#back-to-list-btn');
+        if (backToListBtn) {
+            backToListBtn.addEventListener('click', () => {
+                console.log('Seguimiento: Volviendo a la lista de procesos.');
+                currentProcessId = null; // Limpiar el ID del proceso actual
+                currentModuleView = 'list'; // Volver a la vista de lista
+                render(); // Re-renderiza para mostrar la lista
+            });
+        }
     }
 
+    // Helper para clases de badges (copiado de dashboard.js para consistencia visual)
     function getBadgeClass(estado) {
         switch (estado) {
             case 'En Planificación': return 'secondary';
@@ -339,13 +329,26 @@ const seguimientoModule = (() => {
         }
     }
 
+    /**
+     * Método de inicialización del módulo de seguimiento.
+     * Este es llamado por app.js para cargar el módulo.
+     * @param {string|null} id - El ID del proceso a mostrar en detalle al iniciar el módulo.
+     * @param {HTMLElement} containerElement - El elemento DOM donde el módulo debe renderizar su contenido.
+     */
     return {
         init: (id, containerElement) => {
-            moduleContainer = containerElement; 
-            currentProcesoId = id || null; 
-            console.log('Seguimiento: init() llamado con ID:', id);
-            console.log('Seguimiento: moduleContainer asignado:', moduleContainer); 
-            render();
+            moduleContainer = containerElement; // Asignar el contenedor proporcionado por app.js
+            currentProcessId = id; // Establecer el ID si se proporciona
+            currentModuleView = id ? 'detail' : 'list'; // Si hay ID, ir a detalle; si no, a lista
+
+            console.log(`Seguimiento: init() llamado. ID: ${id}, ContainerElement:`, containerElement);
+            
+            // Verificación explícita del contenedor después de la asignación
+            if (!moduleContainer) {
+                console.error('Seguimiento: Error - containerElement es null o undefined al inicializar el módulo. No se puede renderizar.');
+                return; // No intentar renderizar si el contenedor no es válido
+            }
+            render(); // Llamar a render para mostrar la UI
         }
     };
 })();
