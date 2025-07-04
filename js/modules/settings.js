@@ -39,7 +39,7 @@ const settingsModule = (() => {
                         </div>
                         <hr>
                         <h5>Listas Personalizables</h5>
-                        <p class="text-muted">Edita los valores separados por comas para cada tipo de lista. Los cambios se guardarán automáticamente.</p>
+                        <p class="text-muted">Edita los valores separados por comas para cada tipo de lista.</p>
 
                         <div class="mb-3">
                             <label for="tiposContratacion" class="form-label">Tipos de Contratación</label>
@@ -78,7 +78,7 @@ const settingsModule = (() => {
      * Configura los event listeners para los elementos del formulario de configuración.
      */
     function setupEventListeners() {
-        if (!moduleContainer) return; // Doble verificación por seguridad
+        if (!moduleContainer) return;
 
         const form = moduleContainer.querySelector('#settings-form');
         if (form) {
@@ -119,13 +119,12 @@ const settingsModule = (() => {
         }
     }
 
-    /**
-     * Método de inicialización del módulo de configuración.
-     * Este es llamado por app.js para cargar el módulo.
-     * @param {string|null} id - ID del proceso (no utilizado en settings, pero parte de la firma esperada).
-     * @param {HTMLElement} containerElement - El elemento DOM donde el módulo debe renderizar su contenido.
-     */
     return {
+        /**
+         * Inicializa el módulo de configuración.
+         * @param {string|null} id - ID del proceso (no utilizado en settings, pero parte de la firma esperada).
+         * @param {HTMLElement} containerElement - El elemento DOM donde el módulo debe renderizar su contenido.
+         */
         init: (id, containerElement) => {
             moduleContainer = containerElement; // Asignar el contenedor proporcionado por app.js
             console.log('Settings: init() llamado. ContainerElement:', containerElement);
