@@ -73,8 +73,8 @@ const app = (() => {
             contentContainer.innerHTML = '<div class="d-flex justify-content-center align-items-center" style="min-height: 300px;"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Cargando...</span></div></div>';
             
             // Llamar al método init del módulo, pasándole el ID del proceso si aplica y el contenedor
-            console.log(`app: Pasando contentContainer a ${moduleName}.init():`, contentContainer); // Línea de depuración
-            module.init(currentProcesoId, contentContainer); 
+            console.log(`app: Pasando contentContainer a ${moduleName}.init():`, contentContainer); 
+            module.init(currentProcesoId, contentContainer); // <-- Esta es la línea ~77
             updateActiveNavLink(moduleName);
             console.log(`app: Módulo '${moduleName}' cargado exitosamente.`);
         } else {
