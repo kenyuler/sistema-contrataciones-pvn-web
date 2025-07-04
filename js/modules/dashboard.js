@@ -166,12 +166,11 @@ const dashboardModule = (() => {
 
     // Método de inicialización del módulo dashboard
     return {
-        init: (id, containerElement) => { // 'id' no se usa directamente en dashboard, pero es parte de la firma esperada por app.loadModule
+        init: (id, containerElement) => { // 'id' no se usa en dashboard pero se mantiene para la firma de loadModule
             moduleContainer = containerElement; // ¡Aquí se asigna el contenedor!
             console.log('Dashboard: init() llamado. ContainerElement:', containerElement);
             if (!moduleContainer) {
                 console.error('Dashboard: Error - containerElement es null o undefined al inicializar el módulo. Renderizado abortado.');
-                // No llamar a render si el contenedor es nulo
                 return;
             }
             render();
