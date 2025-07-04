@@ -3,31 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Gestión de Contrataciones</title>
-    <!-- Bootstrap CSS -->
+    <title id="app-title-dynamic">Sistema de Contrataciones</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Bootstrap Icons CSS (Asegúrate de que esta URL sea correcta y accesible) -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
-    <!-- Custom CSS (si tienes alguno) -->
-    <link rel="stylesheet" href="css/style.css"> 
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm">
         <div class="container-fluid">
-            <a class="navbar-brand" href="#" id="navbar-brand-name">Sistema de Contrataciones</a>
+            <a class="navbar-brand" href="#" id="navbar-brand-name">
+                <i class="bi bi-building me-2"></i>Sistema de Contrataciones
+            </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
                         <a class="nav-link active" aria-current="page" href="#" id="nav-dashboard">
-                            <i class="bi bi-house-door-fill me-2"></i>Dashboard
+                            <i class="bi bi-grid-1x2-fill me-2"></i>Dashboard
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="#" id="nav-seguimiento">
-                            <i class="bi bi-bar-chart-steps me-2"></i>Seguimiento
+                            <i class="bi bi-clipboard-data-fill me-2"></i>Seguimiento
                         </a>
                     </li>
                     <li class="nav-item">
@@ -40,29 +39,22 @@
         </div>
     </nav>
 
-    <!-- !!! ESTE ES EL CONTENEDOR CRÍTICO !!! -->
-    <div class="container mt-4" id="content-container">
-        <!-- El contenido de los módulos se cargará aquí -->
-        <div class="d-flex justify-content-center align-items-center" style="min-height: 300px;">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Cargando...</span>
-            </div>
+    <main class="container mt-4">
+        <div id="content-container">
+            <p>Cargando aplicación...</p> 
         </div>
-    </div>
+    </main>
 
-    <!-- Bootstrap JS Bundle (incluye Popper) -->
+    <footer class="footer mt-auto py-3 bg-light">
+        <div class="container text-center">
+            <span class="text-muted">&copy; 2024 Sistema de Contrataciones. Todos los derechos reservados.</span>
+        </div>
+    </footer>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
-    <!-- 
-        *** ORDEN CRÍTICO DE LOS SCRIPTS ***
-        1. data.js: Define y gestiona el almacenamiento de datos (appData). Debe cargar primero.
-        2. Módulos: TODOS los módulos de interfaz de usuario deben cargar ANTES de app.js.
-           Esto asegura que sus variables globales (e.g., dashboardModule) estén definidas.
-        3. app.js: Lógica principal de la aplicación que usa appData y orquesta los módulos.
-    -->
     <script src="js/data.js"></script> 
     
-    <!-- Módulos - deben cargarse ANTES de app.js -->
     <script src="js/modules/dashboard.js"></script>
     <script src="js/modules/seguimiento.js"></script>
     <script src="js/modules/requerimiento.js"></script>
@@ -70,12 +62,10 @@
     <script src="js/modules/segmentacion.js"></script>
     <script src="js/modules/costos.js"></script>
     <script src="js/modules/estrategia.js"></script>
-    <script src="js/modules/settings.js"></script>
+    <script src="js/modules/settings.js"></script> 
 
-    <!-- app.js debe ir DESPUÉS de data.js y de todos los módulos -->
     <script src="js/app.js"></script>
 
-    <!-- Inicialización de la aplicación (se ejecuta cuando el DOM está listo) -->
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             app.init();
