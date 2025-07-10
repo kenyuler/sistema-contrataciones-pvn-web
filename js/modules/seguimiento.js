@@ -2,7 +2,7 @@
 
 const seguimientoModule = (() => {
     let moduleContainer = null;
-    let currentProcesoId = null; 
+    let currentProcesoId = null;
     let currentProcesoData = null; // Para almacenar los datos del proceso actual
 
     // Mapeo de los nombres de los módulos a sus referencias globales
@@ -14,7 +14,7 @@ const seguimientoModule = (() => {
         'estrategia': window.estrategiaModule
     };
 
-    // Funciones de manejo de eventos para limpieza
+    // Funciones de manejo de eventos para limpieza (referencias para off())
     const handleRequerimientoSaved = (data) => handleSubModuleData(data);
     const handleAreaUsuariaSaved = (data) => handleSubModuleData(data);
     const handleSegmentacionSaved = (data) => handleSubModuleData(data);
@@ -29,7 +29,7 @@ const seguimientoModule = (() => {
     function init(procesoId, containerElement) {
         console.log('Seguimiento: init() llamado. Proceso ID:', procesoId, 'ContainerElement:', containerElement);
         moduleContainer = containerElement;
-        currentProcesoId = procesoId; 
+        currentProcesoId = procesoId;
 
         // Cargar los datos del proceso si existe, o inicializar uno nuevo/vacío
         if (currentProcesoId) {
@@ -48,7 +48,12 @@ const seguimientoModule = (() => {
         }
         console.log('Seguimiento: Datos del proceso actual:', currentProcesoData);
 
-        render(); 
+        render(); // Esto renderiza el HTML de las pestañas en moduleContainer.
+
+        // ******************************************************************
+        // LÍNEA DE DEPURACIÓN AÑADIDA: Verifica el HTML de moduleContainer
+        console.log('Seguimiento: HTML de seguimientoModule después de render():', moduleContainer.innerHTML);
+        // ******************************************************************
 
         // Suscribirse a eventos de los submódulos usando eventHandler
         if (window.eventHandler) {
@@ -61,20 +66,24 @@ const seguimientoModule = (() => {
             console.error('Seguimiento: EventHandler no está disponible. No se podrán escuchar eventos de submódulos.');
         }
 
-        // Cargar el primer sub-módulo (pestaña) por defecto al iniciar
-        const defaultTab = 'requerimiento'; 
-        const defaultTabElement = moduleContainer.querySelector(`#seguimientoTabs [data-bs-target="#${defaultTab}"]`);
-        if (defaultTabElement) {
-            if (!defaultTabElement.classList.contains('active')) {
+        // >>>>>>>>>>>>>>>>> MODIFICACIÓN AQUÍ <<<<<<<<<<<<<<<<<
+        // Aplazar la búsqueda y activación de la pestaña por defecto para dar tiempo al DOM
+        setTimeout(() => {
+            const defaultTab = 'requerimiento';
+            const defaultTabElement = moduleContainer.querySelector(`#seguimientoTabs [data-bs-target="#${defaultTab}-pane"]`); 
+            
+            if (defaultTabElement) {
+                console.log(`Seguimiento: Botón de pestaña '${defaultTab}' encontrado DESPUÉS DE setTimeout. Intentando activarlo.`);
+                // No necesitamos otro setTimeout aquí, ya estamos dentro de uno.
                 const bsTab = new bootstrap.Tab(defaultTabElement);
                 bsTab.show();
+                console.log(`Seguimiento: Pestaña '${defaultTab}' activada.`);
             } else {
-                loadSubModule(defaultTab); // Si ya está activa, cárgala
+                console.warn(`Seguimiento: No se encontró la pestaña por defecto: ${defaultTab} INCLUSO DESPUÉS DE setTimeout. Cargando submódulo directamente.`);
+                loadSubModule(defaultTab);
             }
-        } else {
-            console.warn(`Seguimiento: No se encontró la pestaña por defecto: ${defaultTab}`);
-            loadSubModule(defaultTab); // Intenta cargarla de todas formas
-        }
+        }, 100); // Un pequeño retraso de 100ms debería ser suficiente
+        // >>>>>>>>>>>>>>>>> FIN MODIFICACIÓN <<<<<<<<<<<<<<<<<
     }
 
     /**
@@ -85,6 +94,7 @@ const seguimientoModule = (() => {
     function handleSubModuleData(data) {
         console.log(`Seguimiento: Datos recibidos de ${data.module}:`, data.data);
         if (currentProcesoData && data.module) {
+            // Fusiona los datos del submódulo con los datos generales del proceso
             currentProcesoData[data.module] = { ...currentProcesoData[data.module], ...data.data };
             console.log('Seguimiento: Datos del proceso actualizados:', currentProcesoData);
         }
@@ -139,8 +149,9 @@ const seguimientoModule = (() => {
         const tabButtons = moduleContainer.querySelectorAll('#seguimientoTabs .nav-link');
         tabButtons.forEach(button => {
             button.addEventListener('shown.bs.tab', (event) => {
-                const targetId = event.target.dataset.bsTarget.substring(1).replace('-pane', ''); // Obtiene 'requerimiento', etc.
-                loadSubModule(targetId);
+                // Obtiene el nombre del módulo del atributo data-sub-module del botón
+                const subModuleName = event.target.dataset.subModule;
+                loadSubModule(subModuleName);
             });
         });
 
@@ -149,6 +160,11 @@ const seguimientoModule = (() => {
         if (saveProcesoBtn) {
             saveProcesoBtn.addEventListener('click', () => {
                 console.log('Seguimiento: Botón Guardar Proceso clickeado. Datos finales a guardar:', currentProcesoData);
+
+                // Asignar estado inicial si no tiene
+                if (!currentProcesoData.estado) {
+                    currentProcesoData.estado = 'En Proceso';
+                }
 
                 if (currentProcesoId && currentProcesoId !== 'nuevo') {
                     // Si ya existe, actualiza el proceso existente
@@ -161,7 +177,7 @@ const seguimientoModule = (() => {
                     currentProcesoId = savedProceso.id; // Asigna el ID generado
                     currentProcesoData.id = savedProceso.id; // Actualiza los datos del proceso
                 }
-                
+
                 // Redirigir al dashboard después de guardar
                 if (window.app && typeof window.app.loadModule === 'function') {
                     window.app.loadModule('dashboard');
@@ -189,20 +205,21 @@ const seguimientoModule = (() => {
     function loadSubModule(subModuleName) {
         console.log(`Seguimiento: Intentando cargar sub-módulo: ${subModuleName}`);
         // Utiliza el id del panel que contiene el contenido (ej. #requerimiento-pane)
-        const subModuleContainer = moduleContainer.querySelector(`#${subModuleName}-pane`); 
+        const subModuleContainer = moduleContainer.querySelector(`#${subModuleName}-pane`);
 
         if (!subModuleContainer) {
             console.error(`Seguimiento: No se encontró el contenedor para el sub-módulo: #${subModuleName}-pane`);
             return;
         }
 
-        const subModule = subModules[subModuleName]; 
+        const subModule = subModules[subModuleName];
 
         if (subModule && typeof subModule.init === 'function') {
             console.log(`Seguimiento: Sub-módulo '${subModuleName}' encontrado y tiene método 'init'.`);
             // Pasamos los datos específicos de este sub-módulo al init
-            const subModuleSpecificData = currentProcesoData ? currentProcesoData[subModuleName] : {};
-            subModule.init(currentProcesoId, subModuleContainer, subModuleSpecificData); 
+            const subModuleSpecificData = currentProcesoData ? currentProcesoData[subModuleName] || {} : {}; // Asegura que sea un objeto vacío si es undefined
+            subModuleContainer.innerHTML = ''; // Limpiar el contenedor antes de cargar el nuevo submódulo
+            subModule.init(currentProcesoId, subModuleContainer, subModuleSpecificData);
             console.log(`Seguimiento: Sub-módulo '${subModuleName}' cargado exitosamente.`);
         } else {
             console.error(`Seguimiento: El sub-módulo '${subModuleName}' no se encontró o no tiene un método 'init'.`);
@@ -222,11 +239,14 @@ const seguimientoModule = (() => {
             window.eventHandler.off('estrategiaSaved', handleEstrategiaSaved);
             console.log('Seguimiento: Listeners de eventos de submódulos limpiados.');
         }
+        // También podrías resetear currentProcesoData a null para liberar memoria
+        currentProcesoData = null;
+        currentProcesoId = null;
     }
 
     return {
         init: init,
-        cleanup: cleanup 
+        cleanup: cleanup
     };
 })();
 
